@@ -179,6 +179,8 @@ static void readcolonargs(char **, int, int[][CAR_PER_ARG]);
 #endif // UNDERCURL_PATCH
 static void csiparse(void);
 static void csireset(void);
+static void osc4_color_response(int num);
+static void osc_color_response(int index, int num);
 static int eschandle(uchar);
 static void strdump(void);
 static void strhandle(void);
@@ -2821,6 +2823,42 @@ csireset(void)
 }
 
 void
+osc4_color_response(int num)
+{
+	int n;
+	char buf[32];
+	unsigned char r, g, b;
+
+	if (xgetcolor(num, &r, &g, &b)) {
+		fprintf(stderr, "erresc: failed to fetch osc4 color %d\n", num);
+		return;
+	}
+
+	n = snprintf(buf, sizeof buf, "\033]4;%d;rgb:%02x%02x/%02x%02x/%02x%02x\007",
+			num, r, r, g, g, b, b);
+
+	ttywrite(buf, n, 1);
+}
+
+void
+osc_color_response(int index, int num)
+{
+	int n;
+	char buf[32];
+	unsigned char r, g, b;
+
+	if (xgetcolor(index, &r, &g, &b)) {
+		fprintf(stderr, "erresc: failed to fetch osc color %d\n", index);
+		return;
+	}
+
+	n = snprintf(buf, sizeof buf, "\033]%d;rgb:%02x%02x/%02x%02x/%02x%02x\007",
+			num, r, r, g, g, b, b);
+
+	ttywrite(buf, n, 1);
+}
+
+void
 strhandle(void)
 {
 	char *p = NULL, *dec;
@@ -2899,44 +2937,45 @@ strhandle(void)
 				}
 			}
 			return;
-		case 10: /* foreground set */
-			#if OSC_10_11_12_2_PATCH
+		case 10:
 			if (narg < 2)
 				break;
 
 			p = strescseq.args[1];
-			if (xsetcolorname(defaultfg, p))
-				fprintf(stderr, "erresc: invalid foreground color %s\n", p);
+
+			if (!strcmp(p, "?"))
+				osc_color_response(defaultfg, 10);
+			else if (xsetcolorname(defaultfg, p))
+				fprintf(stderr, "erresc: invalid foreground color: %s\n", p);
 			else
-				redraw();
-			break;
+				tfulldirt();
 			return;
-			#endif // OSC_10_11_12_2_PATCH
-		case 11: /* background set */
-			#if OSC_10_11_12_2_PATCH
+		case 11:
 			if (narg < 2)
 				break;
 
 			p = strescseq.args[1];
-			if (xsetcolorname(defaultbg, p))
-				fprintf(stderr, "erresc: invalid background color %s\n", p);
+
+			if (!strcmp(p, "?"))
+				osc_color_response(defaultbg, 11);
+			else if (xsetcolorname(defaultbg, p))
+				fprintf(stderr, "erresc: invalid background color: %s\n", p);
 			else
-				redraw();
-			break;
+				tfulldirt();
 			return;
-			#endif // OSC_10_11_12_2_PATCH
-		case 12: /* cursor color */
-			#if OSC_10_11_12_2_PATCH
+		case 12:
 			if (narg < 2)
 				break;
 
 			p = strescseq.args[1];
-			if (xsetcolorname(defaultcs, p))
-				fprintf(stderr, "erresc: invalid cursor color %s\n", p);
+
+			if (!strcmp(p, "?"))
+				osc_color_response(defaultcs, 12);
+			else if (xsetcolorname(defaultcs, p))
+				fprintf(stderr, "erresc: invalid cursor color: %s\n", p);
 			else
-				redraw();
-			break;
-			#endif // OSC_10_11_12_2_PATCH
+				tfulldirt();
+			return;
 		case 4: /* color set */
 			if ((par == 4 && narg < 3) || narg < 2)
 				break;
@@ -2946,7 +2985,7 @@ strhandle(void)
 			p = strescseq.args[((par == 4) ? 2 : 1)];
 			#endif // COLUMNS_REFLOW_PATCH
 			/* FALLTHROUGH */
-		case 104: /* color reset, here p = NULL */
+		case 104: /* color reset */
 			if (par == 10)
 				j = defaultfg;
 			else if (par == 11)
@@ -2960,7 +2999,9 @@ strhandle(void)
 				j = (narg > 1) ? atoi(strescseq.args[1]) : -1;
 				#endif // COLUMNS_REFLOW_PATCH
 
-			if (xsetcolorname(j, p)) {
+			if (p && !strcmp(p, "?"))
+				osc4_color_response(j);
+			else if (xsetcolorname(j, p)) {
 				if (par == 104 && narg <= 1)
 					return; /* color reset without parameter */
 				fprintf(stderr, "erresc: invalid color j=%d, p=%s\n",
@@ -2968,7 +3009,7 @@ strhandle(void)
 			} else {
 				if (j == defaultbg)
 					xclearwin();
-				redraw();
+				tfulldirt();
 			}
 			return;
 		}
@@ -3655,6 +3696,10 @@ check_control_code:
 	if (width == 2) {
 		gp->mode |= ATTR_WIDE;
 		if (term.c.x+1 < term.col) {
+			if (gp[1].mode == ATTR_WIDE && term.c.x+2 < term.col) {
+				gp[2].u = ' ';
+				gp[2].mode &= ~ATTR_WDUMMY;
+			}
 			gp[1].u = '\0';
 			gp[1].mode = ATTR_WDUMMY;
 		}
