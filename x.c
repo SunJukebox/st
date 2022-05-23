@@ -117,6 +117,9 @@ static void selnotify(XEvent *);
 static void selclear_(XEvent *);
 static void selrequest(XEvent *);
 static void setsel(char *, Time);
+#if XRESOURCES_PATCH && XRESOURCES_RELOAD_PATCH || BACKGROUND_IMAGE_PATCH && BACKGROUND_IMAGE_RELOAD_PATCH
+static void sigusr1_reload(int sig);
+#endif // XRESOURCES_RELOAD_PATCH | BACKGROUND_IMAGE_RELOAD_PATCH
 static int mouseaction(XEvent *, uint);
 static void mousesel(XEvent *, int);
 static void mousereport(XEvent *);
@@ -548,6 +551,14 @@ propnotify(XEvent *e)
 			 xpev->atom == clipboard)) {
 		selnotify(e);
 	}
+
+	#if BACKGROUND_IMAGE_PATCH
+	if (pseudotransparency &&
+		!strncmp(XGetAtomName(xw.dpy, e->xproperty.atom), "_NET_WM_STATE", 13)) {
+		updatexy();
+		redraw();
+	}
+	#endif // BACKGROUND_IMAGE_PATCH
 }
 
 void
@@ -578,7 +589,12 @@ selnotify(XEvent *e)
 			return;
 		}
 
-		if (e->type == PropertyNotify && nitems == 0 && rem == 0) {
+		#if BACKGROUND_IMAGE_PATCH
+		if (e->type == PropertyNotify && nitems == 0 && rem == 0 && !pseudotransparency)
+		#else
+		if (e->type == PropertyNotify && nitems == 0 && rem == 0)
+		#endif // BACKGROUND_IMAGE_PATCH
+		{
 			/*
 			 * If there is some PropertyNotify with no data, then
 			 * this is the signal of the selection owner that all
@@ -596,9 +612,15 @@ selnotify(XEvent *e)
 			 * when the selection owner does send us the next
 			 * chunk of data.
 			 */
+			#if BACKGROUND_IMAGE_PATCH
+			if (!pseudotransparency) {
+			#endif // BACKGROUND_IMAGE_PATCH
 			MODBIT(xw.attrs.event_mask, 1, PropertyChangeMask);
 			XChangeWindowAttributes(xw.dpy, xw.win, CWEventMask,
 					&xw.attrs);
+			#if BACKGROUND_IMAGE_PATCH
+			}
+			#endif // BACKGROUND_IMAGE_PATCH
 
 			/*
 			 * Deleting the property is the transfer start signal.
@@ -724,6 +746,20 @@ setsel(char *str, Time t)
 	clipcopy(NULL);
 	#endif // CLIPBOARD_PATCH
 }
+
+#if XRESOURCES_PATCH && XRESOURCES_RELOAD_PATCH || BACKGROUND_IMAGE_PATCH && BACKGROUND_IMAGE_RELOAD_PATCH
+void
+sigusr1_reload(int sig)
+{
+	#if XRESOURCES_PATCH && XRESOURCES_RELOAD_PATCH
+	reload_config(sig);
+	#endif // XRESOURCES_RELOAD_PATCH
+	#if BACKGROUND_IMAGE_PATCH && BACKGROUND_IMAGE_RELOAD_PATCH
+	reload_image();
+	#endif // BACKGROUND_IMAGE_RELOAD_PATCH
+	signal(SIGUSR1, sigusr1_reload);
+}
+#endif // XRESOURCES_RELOAD_PATCH | BACKGROUND_IMAGE_RELOAD_PATCH
 
 void
 xsetsel(char *str)
@@ -997,7 +1033,11 @@ xsetcolorname(int x, const char *name)
 void
 xclear(int x1, int y1, int x2, int y2)
 {
-	#if INVERT_PATCH
+	#if BACKGROUND_IMAGE_PATCH
+	if (pseudotransparency)
+		XSetTSOrigin(xw.dpy, xw.bggc, -win.x, -win.y);
+	XFillRectangle(xw.dpy, xw.buf, xw.bggc, x1, y1, x2-x1, y2-y1);
+	#elif INVERT_PATCH
 	Color c;
 	c = dc.col[IS_SET(MODE_REVERSE)? defaultfg : defaultbg];
 	if (invertcolors) {
@@ -1337,8 +1377,10 @@ xinit(int cols, int rows)
 	XVisualInfo vis;
 	#endif // ALPHA_PATCH
 
+	#if !XRESOURCES_PATCH
 	if (!(xw.dpy = XOpenDisplay(NULL)))
 		die("can't open display\n");
+	#endif // XRESOURCES_PATCH
 	xw.scr = XDefaultScreen(xw.dpy);
 
 	#if ALPHA_PATCH
@@ -1911,6 +1953,11 @@ xdrawglyphfontspecs(const XftGlyphFontSpec *specs, Glyph base, int len, int x, i
 	#endif // ANYSIZE_PATCH
 
 	/* Clean up the region we want to draw to. */
+	#if BACKGROUND_IMAGE_PATCH
+	if (bg == &dc.col[defaultbg])
+		xclear(winx, winy, winx + width, winy + win.ch);
+	else
+	#endif // BACKGROUND_IMAGE_PATCH
 	XftDrawRect(xw.draw, bg, winx, winy, width, win.ch);
 	#if WIDE_GLYPHS_PATCH
 	}
@@ -1984,9 +2031,8 @@ xdrawglyphfontspecs(const XftGlyphFontSpec *specs, Glyph base, int len, int x, i
 
 		// Underline Style
 		if (base.ustyle != 3) {
-			//XftDrawRect(xw.draw, fg, winx, winy + dc.font.ascent + 1, width, 1);
 			XFillRectangle(xw.dpy, XftDrawDrawable(xw.draw), ugc, winx,
-				winy + dc.font.ascent + 1, width, wlw);
+				winy + dc.font.ascent * chscale + 1, width, wlw);
 		} else if (base.ustyle == 3) {
 			int ww = win.cw;//width;
 			int wh = dc.font.descent - wlw/2 - 1;//r.height/7;
@@ -2298,20 +2344,20 @@ xdrawglyphfontspecs(const XftGlyphFontSpec *specs, Glyph base, int len, int x, i
 
 		XFreeGC(xw.dpy, ugc);
 		#elif VERTCENTER_PATCH
-		XftDrawRect(xw.draw, fg, winx, winy + win.cyo + dc.font.ascent + 1,
+		XftDrawRect(xw.draw, fg, winx, winy + win.cyo + dc.font.ascent * chscale + 1,
 				width, 1);
 		#else
-		XftDrawRect(xw.draw, fg, winx, winy + dc.font.ascent + 1,
+		XftDrawRect(xw.draw, fg, winx, winy + dc.font.ascent * chscale + 1,
 				width, 1);
 		#endif // UNDERCURL_PATCH | VERTCENTER_PATCH
 	}
 
 	if (base.mode & ATTR_STRUCK) {
 		#if VERTCENTER_PATCH
-		XftDrawRect(xw.draw, fg, winx, winy + win.cyo + 2 * dc.font.ascent / 3,
+		XftDrawRect(xw.draw, fg, winx, winy + win.cyo + 2 * dc.font.ascent * chscale / 3,
 				width, 1);
 		#else
-		XftDrawRect(xw.draw, fg, winx, winy + 2 * dc.font.ascent / 3,
+		XftDrawRect(xw.draw, fg, winx, winy + 2 * dc.font.ascent * chscale / 3,
 				width, 1);
 		#endif // VERTCENTER_PATCH
 	}
@@ -3094,6 +3140,15 @@ resize(XEvent *e)
 	XWindowChanges wc;
 	#endif // ST_EMBEDDER_PATCH
 
+	#if BACKGROUND_IMAGE_PATCH
+	if (pseudotransparency) {
+		if (e->xconfigure.width == win.w &&
+			e->xconfigure.height == win.h &&
+			e->xconfigure.x == win.x && e->xconfigure.y == win.y)
+			return;
+		updatexy();
+	} else
+	#endif // BACKGROUND_IMAGE_PATCH
 	if (e->xconfigure.width == win.w && e->xconfigure.height == win.h)
 		return;
 
@@ -3364,14 +3419,15 @@ run:
 
 	setlocale(LC_CTYPE, "");
 	XSetLocaleModifiers("");
-	#if XRESOURCES_RELOAD_PATCH && XRESOURCES_PATCH
-	reload_config(-1);
-	#elif XRESOURCES_PATCH
+	#if XRESOURCES_PATCH && XRESOURCES_RELOAD_PATCH || BACKGROUND_IMAGE_PATCH && BACKGROUND_IMAGE_RELOAD_PATCH
+	signal(SIGUSR1, sigusr1_reload);
+	#endif // XRESOURCES_RELOAD_PATCH | BACKGROUND_IMAGE_RELOAD_PATCH
+	#if XRESOURCES_PATCH
 	if (!(xw.dpy = XOpenDisplay(NULL)))
 		die("Can't open display\n");
 
-	config_init();
-	#endif // XRESOURCES_RELOAD_PATCH
+	config_init(xw.dpy);
+	#endif // XRESOURCES_PATCH
 	cols = MAX(cols, 1);
 	rows = MAX(rows, 1);
 	#if ALPHA_PATCH && ALPHA_FOCUS_HIGHLIGHT_PATCH
@@ -3379,6 +3435,9 @@ run:
 	#endif // ALPHA_FOCUS_HIGHLIGHT_PATCH
 	tnew(cols, rows);
 	xinit(cols, rows);
+	#if BACKGROUND_IMAGE_PATCH
+	bginit();
+	#endif // BACKGROUND_IMAGE_PATCH
 	xsetenv();
 	selinit();
 	#if WORKINGDIR_PATCH

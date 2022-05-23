@@ -1,4 +1,4 @@
-Similar to [dwm-flexipatch](https://github.com/bakkeby/dwm-flexipatch) this st 0.8.5 (e823e23, 2022-02-17) project has a different take on st patching. It uses preprocessor directives to decide whether or not to include a patch during build time. Essentially this means that this build, for better or worse, contains both the patched _and_ the original code. The aim being that you can select which patches to include and the build will contain that code and nothing more.
+Similar to [dwm-flexipatch](https://github.com/bakkeby/dwm-flexipatch) this st 0.8.5 (ef05519, 2022-03-18) project has a different take on st patching. It uses preprocessor directives to decide whether or not to include a patch during build time. Essentially this means that this build, for better or worse, contains both the patched _and_ the original code. The aim being that you can select which patches to include and the build will contain that code and nothing more.
 
 For example to include the `alpha` patch then you would only need to flip this setting from 0 to 1 in [patches.h](https://github.com/bakkeby/st-flexipatch/blob/master/patches.def.h):
 ```c
@@ -15,11 +15,11 @@ Refer to [https://st.suckless.org/](https://st.suckless.org/) for details on the
 
 ### Changelog:
 
-<<<<<<< HEAD
-2021-12-25 - Added the columns reflow patch
-=======
+2022-04-11 - Added the background image reload patch
+
+2022-03-10 - Added the background image patch
+
 2022-02-24 - Upgraded to st 0.8.5 e823e23, 2022-02-17 - removing osc_10_11_12_2 patch as no longer relevant
->>>>>>> 4a156b95f97cc1791983b10b0f1e56d77670e125
 
 2021-08-18 - Added the CSI 22 & 23 patch
 
@@ -99,6 +99,13 @@ Refer to [https://st.suckless.org/](https://st.suckless.org/) for details on the
       - a patch that aims to prevent black bars being drawn on the edges of st terminals using the
         anysize patch
 
+   - [background-image](https://st.suckless.org/patches/background_image/)
+      - draws a background image in farbfeld format in place of the defaultbg color allowing for
+        pseudo transparency
+
+   - background-image-reload
+      - allows the background image to be reloaded similar to xresources using USR1 signals
+
    - [blinking-cursor](https://st.suckless.org/patches/blinking_cursor/)
       - allows the use of a blinking cursor
 
@@ -116,10 +123,6 @@ Refer to [https://st.suckless.org/](https://st.suckless.org/) for details on the
    - [columns](https://github.com/bakkeby/st-flexipatch/issues/34)
       - allows st to be resized without cutting off text when the terminal window is made larger again
       - text does not wrap when the terminal window is made smaller
-
-   - [columns_reflow](https://github.com/BeyondMagic/st/blob/master/patches/columns-rows-reflow-st-unpatched.patch)
-      - allows st to be resized without cutting off text when the terminal window is made larger again
-      - text wraps when the terminal window is made smaller
 
    - [copyurl](https://st.suckless.org/patches/copyurl/)
       - this patch allows you to select and copy the last URL displayed with Mod+l
