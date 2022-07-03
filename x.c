@@ -2347,7 +2347,7 @@ xdrawglyphfontspecs(const XftGlyphFontSpec *specs, Glyph base, int len, int x, i
 		XftDrawRect(xw.draw, fg, winx, winy + win.cyo + dc.font.ascent * chscale + 1,
 				width, 1);
 		#else
-		XftDrawRect(xw.draw, fg, winx, winy + dc.font.ascent * chscale + 1,
+		XftDrawRect(xw.draw, fg, winx, winy + dc.font.ascent * chscale + 4,
 				width, 1);
 		#endif // UNDERCURL_PATCH | VERTCENTER_PATCH
 	}

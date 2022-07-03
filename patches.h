@@ -360,7 +360,7 @@
  *
  * https://st.suckless.org/patches/undercurl/
  */
-#define UNDERCURL_PATCH 1
+#define UNDERCURL_PATCH 0
 
 /* Allows mouse scroll without modifier keys for regardless of alt screen using the external
  * scroll program.
