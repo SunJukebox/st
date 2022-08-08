@@ -5,10 +5,10 @@
  *
  * font: see http://freedesktop.org/software/fontconfig/fontconfig-user.html
  */
-static char *font = "monospace:size=16";
+static char *font = "monospace:size=11";
 #if FONT2_PATCH
 /* Spare fonts */
-static char *font2[] = {"emoji:size=15"};
+static char *font2[] = {"emoji:size=11"};
 #endif // FONT2_PATCH
 
 #if RELATIVEBORDER_PATCH
