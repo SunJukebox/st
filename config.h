@@ -5,10 +5,10 @@
  *
  * font: see http://freedesktop.org/software/fontconfig/fontconfig-user.html
  */
-static char *font = "monospace:size=16";
+static char *font = "monospace:style=regular:size=11";
 #if FONT2_PATCH
 /* Spare fonts */
-static char *font2[] = {"emoji:size=15"};
+static char *font2[] = {"emoji:size=10"};
 #endif // FONT2_PATCH
 
 #if RELATIVEBORDER_PATCH
@@ -390,7 +390,7 @@ static Shortcut shortcuts[] = {
 	#if ALPHA_PATCH
     { MODKEY,               XK_s,           changealpha,     {.f = -0.05} },
     { MODKEY,               XK_a,           changealpha,     {.f = +0.05} },
-    #endif  // ALPHA_PATCH
+  #endif  // ALPHA_PATCH
 	{ MODKEY,               XK_c,           clipcopy,        {.i =  0} },
 	{ MODKEY,               XK_v,           clippaste,       {.i =  0} },
 	{ XK_ANY_MOD,           Button2,        selpaste,        {.i =  0} },
